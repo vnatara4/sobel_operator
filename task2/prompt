@@ -1,0 +1,27 @@
+
+
+For this task, please write programs in C, to be compiled with GCC,
+that will perform a simple image-processing task.  Your code should
+be written with an emphasis on reducing run time while maintaining
+good programming practices.
+
+You may use the proveded code to read and write a pgm image file, but
+all other code must be your own.  You are welcome to modify the
+provided code in any way you see fit.
+
+For this task, please write two different programs.  Each of the
+programs should read in the provided kitten.pgm grayscale image file,
+perform an operation on that image, and then save the output in a new
+pgm file, leaving kitten.pgm unaltered.
+
+1)  The first should implement a Sobel operator.  Please use Wikipedia
+    for a more complete description of that operation.  In summary, you
+	will process a grayscale image, and the result will be a new gray-scale
+	image wher the intensity of each pixel corresponds to the magnitude 
+	of the gradient at that pixel in the origional image.
+
+2)	Implement a Sobel like operator with only a single kernel, where the
+	kernel's size can be easily specified, and the coefficients readily
+	specified at compile time.  You may assume that all of the
+	coefficients are always integers.
+
