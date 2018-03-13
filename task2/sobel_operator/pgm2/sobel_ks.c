@@ -12,6 +12,9 @@
 #define INPUT_FILE "kitten.pgm"
 #define OUTPUT_FILE "output_ks.pgm"
 
+// Macro used for enabling optimization
+#define OPT
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,7 +57,11 @@ int main() {
 				}
 			}			
 
+#ifdef OPT
+			output_gray[i * col + j] = abs(pixel_x) + abs(pixel_y);
+#else
 			output_gray[i * col + j] = sqrt(pow(pixel_x, 2) + pow(pixel_y, 2));
+#endif
 		}
 	}
 

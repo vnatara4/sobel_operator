@@ -11,8 +11,13 @@
 #define INPUT_FILE "kitten.pgm"
 #define OUTPUT_FILE "output.pgm"
 
-#define OPT
-#define OPT2
+// Macro used for enabling optimization
+#define OPT1
+//#define OPT2
+#define OPT3
+
+// Macro used for enabling DEBUG prints
+#define DEBUG
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,60 +50,55 @@ int main() {
 		return -1;
 	}
 
-	tmp_y = (int **)malloc(2 * sizeof(int *));
-	for(i = 0; i < 2; i++) {
-		tmp_y[i] = (int *)malloc(col * sizeof(int));
-	}	
-
 	memset(output_img.data, 0x00, row * col* sizeof(int));
 
 	output_gray = output_img.data;
 	input_gray = input_img.data;	
 
+#ifdef DEBUG
 	start = clock();
+#endif
+
+/* OPT1 : 
+		When we calculate for first element, we will multiply the third column by [-1 -2 -1], then two steps later,
+        we will again multiply third column by [1 2 1]. We do not have to calculate again, we can just negate first
+        calculated value and use that again. This optimization is meant to utilize that opportunity and instead of loading
+        kernel matrix value from array everytime, it is hardcoded in the convolution equation to decrease execution time.
+*/
+#ifdef OPT1
+	
+	// For producing pixel_y for first two rows, we need to calculate part of the convolution.
+	tmp_y = (int **)malloc(2 * sizeof(int *));
+	for(i = 0; i < 2; i++) {
+		tmp_y[i] = (int *)malloc(col * sizeof(int));
+	}	
 
 	for(j = 1; j < col - 1; j++) {
 		tmp_y[1][j] = -(input_gray[(j - 1)]) + (input_gray[j] * -2) - (input_gray[(j + 1)]);
 		tmp_y[0][j] = -(input_gray[col + (j - 1)]) + (input_gray[col + j] * -2) - (input_gray[col + (j + 1)]);
 	}
 
+#endif
 	// Performing sobel operation on input image
 	for(i = 1; i < row - 1; i++) {
 
-#ifdef OPT
 #ifdef OPT1
-		tmp_x[1] = (input_gray[(i - 1)] * g_x[0][0]) + (input_gray[i * col] * g_x[1][0]) + (input_gray[(i + 1) * col] * g_x[2][0]);
-		tmp_x[0] = (input_gray[(i - 1) * col + 2] * g_x[0][2]) + (input_gray[i * col + 2] * g_x[1][2]) + (input_gray[(i + 1) * col + 2] * g_x[2][2]);
-#endif
-
-#ifdef OPT2
 		tmp_x[1] = (input_gray[(i - 1)]) + (input_gray[i * col] * 2) + (input_gray[(i + 1) * col]);
 		tmp_x[0] = -(input_gray[(i - 1) * col + 2]) + (input_gray[i * col + 2] * -2) - (input_gray[(i + 1) * col + 2]);					
 #endif
-#endif
+
 		for(j = 1; j < col - 1; j++) {
 			pixel_x = pixel_y = 0;
 
-#ifdef OPT
 #ifdef OPT1
+			// Making use of the already already calculated value for performing convolution
 			pixel_x = -tmp_x[(j % 2)];
-			tmp_x[(j % 2)] = (input_gray[(i - 1) * col + (j + 1)] * g_x[0][2]) + (input_gray[i * col + (j + 1)] * g_x[1][2]) + (input_gray[(i + 1) * col + (j + 1)] * g_x[2][2]);
+			tmp_x[(j % 2)] = -(input_gray[(i - 1) * col + (j + 1)]) + (input_gray[i * col + (j + 1)] * -2) - (input_gray[(i + 1) * col + (j + 1)]);
 			pixel_x += tmp_x[(j % 2)];
-			
+
 			pixel_y = -tmp_y[(i % 2)][j];
-			tmp_y[(i % 2)][j] = (input_gray[(i + 1) * col + (j - 1)] * g_y[2][0]) + (input_gray[(i + 1) * col + j] * g_y[2][1]) + (input_gray[(i + 1) * col + (j + 1)] * g_y[2][2]); 
+			tmp_y[(i % 2)][j] = (input_gray[(i + 1) * col + (j - 1)]) + (input_gray[(i + 1) * col + j] * 2) + (input_gray[(i + 1) * col + (j + 1)]); 
 			pixel_y += tmp_y[(i % 2)][j];
-#endif
-#ifdef OPT2
-		pixel_x = -tmp_x[(j % 2)];
-		tmp_x[(j % 2)] = -(input_gray[(i - 1) * col + (j + 1)]) + (input_gray[i * col + (j + 1)] * -2) - (input_gray[(i + 1) * col + (j + 1)]);
-		pixel_x += tmp_x[(j % 2)];
-
-		pixel_y = -tmp_y[(i % 2)][j];
-		tmp_y[(i % 2)][j] = (input_gray[(i + 1) * col + (j - 1)]) + (input_gray[(i + 1) * col + j] * 2) + (input_gray[(i + 1) * col + (j + 1)]); 
-		pixel_y += tmp_y[(i % 2)][j];
-
-#endif
 
 #else
 			pixel_x += (input_gray[(i - 1) * col + (j - 1)] * g_x[0][0]) + (input_gray[i * col + (j - 1)] * g_x[1][0]) + (input_gray[(i + 1) * col + (j - 1)] * g_x[2][0]) +
@@ -109,26 +109,35 @@ int main() {
 					   (input_gray[(i + 1) * col + (j - 1)] * g_y[2][0]) + (input_gray[(i + 1) * col + j] * g_y[2][1]) + (input_gray[(i + 1) * col + (j + 1)] * g_y[2][2]);
 #endif
 
-#ifdef OPT
-#if 0
+/*
+  OPT2: This for utilizing lookup table for calculating square root of a number.
+		Look up table contains entries only upto 65026 because sqrt(650256) is 255 and since
+		maximum value a pixel can hold is 255, it is enough to create lookup only for limited
+		number of entries. 
+*/
+#ifdef OPT2
 			val = (pixel_x * pixel_x) + (pixel_y * pixel_y);
 			if (val > 65026) {
 				output_gray[i * col + j] = 255;
 			} else {
 				output_gray[i * col + j] = SQRT[val];
 			}
-#else
-			output_gray[i * col + j] = abs(pixel_x) + abs(pixel_y);
 #endif
+/* OPT3: Approximating expression sqrt(x*x + y*y) to abs(x) + abs(y) 
+*/
+#ifdef OPT3
+			output_gray[i * col + j] = abs(pixel_x) + abs(pixel_y);
 #else
 			output_gray[i * col + j] = sqrt(pixel_x * pixel_x + pixel_y * pixel_y);
 #endif
 		}
 	}
+#ifdef DEBUG
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
 	printf("Time used: %f\n", cpu_time_used);
+#endif
 	output_img.row = row;
 	output_img.col = col;
 	output_img.max_gray = input_img.max_gray;
